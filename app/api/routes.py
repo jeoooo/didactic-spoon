@@ -1,12 +1,15 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_scoring_provider
-from app.core.errors import UpstreamAppError, ValidationAppError
+from app.core.errors import NotFoundAppError, UpstreamAppError, ValidationAppError
+from app.core.hashing import sha256
 from app.core.ids import short_id
 from app.core.pdf import PDFExtractionError, extract_text_from_pdf
 from app.core.scoring import ScoringError, ScoringProvider
+from app.models.db import Analysis, get_session
 from app.models.schemas import AnalysisResult
 
 router = APIRouter()
@@ -23,6 +26,7 @@ async def analyze(
     resume_file: UploadFile | None = File(None),
     resume_text: str | None = Form(None),
     scoring_provider: ScoringProvider = Depends(get_scoring_provider),
+    session: AsyncSession = Depends(get_session),
 ) -> AnalysisResult:
     if not job_description or not job_description.strip():
         raise ValidationAppError("job_description is required")
@@ -51,9 +55,33 @@ async def analyze(
     except ScoringError as exc:
         raise UpstreamAppError(str(exc)) from exc
 
-    return AnalysisResult(
+    result = AnalysisResult(
         id=short_id(),
         cached=False,
         created_at=datetime.now(timezone.utc),
         **llm_result.model_dump(),
     )
+
+    row = Analysis(
+        id=result.id,
+        resume_hash=sha256(resume_content),
+        jd_hash=sha256(job_description),
+        match_score=result.match_score,
+        result_json=result.model_dump(mode="json"),
+    )
+    session.add(row)
+    await session.commit()
+
+    return result
+
+
+@router.get("/analyze/{analysis_id}", response_model=AnalysisResult)
+async def get_analysis(
+    analysis_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> AnalysisResult:
+    row = await session.get(Analysis, analysis_id)
+    if row is None:
+        raise NotFoundAppError(f"No analysis found with id '{analysis_id}'")
+
+    return AnalysisResult.model_validate(row.result_json)
