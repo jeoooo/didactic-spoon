@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import get_cached_result
 from app.core.deps import get_scoring_provider
 from app.core.errors import NotFoundAppError, UpstreamAppError, ValidationAppError
 from app.core.hashing import sha256
@@ -50,6 +51,13 @@ async def analyze(
     else:
         resume_content = resume_text
 
+    resume_hash = sha256(resume_content)
+    jd_hash = sha256(job_description)
+
+    cached_result = await get_cached_result(session, resume_hash, jd_hash)
+    if cached_result is not None:
+        return cached_result
+
     try:
         llm_result = scoring_provider.score(resume_content, job_description)
     except ScoringError as exc:
@@ -64,8 +72,8 @@ async def analyze(
 
     row = Analysis(
         id=result.id,
-        resume_hash=sha256(resume_content),
-        jd_hash=sha256(job_description),
+        resume_hash=resume_hash,
+        jd_hash=jd_hash,
         match_score=result.match_score,
         result_json=result.model_dump(mode="json"),
     )
