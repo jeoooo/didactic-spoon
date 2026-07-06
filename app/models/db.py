@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -20,7 +21,9 @@ class Analysis(Base):
     resume_hash: Mapped[str] = mapped_column(String, nullable=False)
     jd_hash: Mapped[str] = mapped_column(String, nullable=False)
     match_score: Mapped[int] = mapped_column(nullable=False)
-    result_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    result_json: Mapped[dict] = mapped_column(
+        JSONB().with_variant(SQLiteJSON(), "sqlite"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), nullable=False
     )
