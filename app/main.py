@@ -5,7 +5,13 @@ from fastapi.responses import JSONResponse
 from app.api.routes import router as api_router
 from app.core.errors import AppError
 
-app = FastAPI(title="AI Resume Screener API", version="0.1.0")
+app = FastAPI(
+    title="AI Resume Screener API",
+    version="0.1.0",
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
+    openapi_url="/api/v1/openapi.json",
+)
 
 app.include_router(api_router, prefix="/api/v1")
 
