@@ -7,8 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from app.core.deps import get_scoring_provider
+from app.core.rate_limit import limiter
 from app.main import app
 from app.models.db import Base, get_session
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    limiter.reset()
+    yield
+    limiter.reset()
 
 
 @pytest_asyncio.fixture

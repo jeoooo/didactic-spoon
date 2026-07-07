@@ -154,3 +154,19 @@ async def test_health_check(client):
     resp = await client.get("/api/v1/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
+
+
+async def test_analyze_rate_limit_returns_429(client, mock_scoring_provider):
+    mock_scoring_provider.score.return_value = VALID_ANALYSIS
+    payload = {
+        "job_description": "Looking for a Python backend engineer.",
+        "resume_text": "I have 3 years of Python and FastAPI experience.",
+    }
+
+    for _ in range(10):
+        resp = await client.post("/api/v1/analyze", data=payload)
+        assert resp.status_code == 200
+
+    resp = await client.post("/api/v1/analyze", data=payload)
+    assert resp.status_code == 429
+    assert resp.json()["error"] == "rate_limited"
