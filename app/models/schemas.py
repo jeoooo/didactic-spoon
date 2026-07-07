@@ -43,6 +43,15 @@ class LLMAnalysis(BaseModel):
         return max(0, min(100, int(v)))
 
 
+class AnalysisListResponse(BaseModel):
+    """Paginated list of past analyses, newest first."""
+
+    items: list[AnalysisResult]
+    total: int
+    limit: int
+    offset: int
+
+
 class ErrorResponse(BaseModel):
     error: str
     detail: str
