@@ -13,5 +13,7 @@ class Settings(BaseSettings):
     max_resume_chars: int = 20000
     max_jd_chars: int = 10000
 
+    analyze_rate_limit: str = "10/minute"
+
 
 settings = Settings()

@@ -88,6 +88,10 @@ curl http://localhost:8000/api/v1/analyze/a1b2c3d4
   not instructions, to reduce prompt-injection risk (not a complete defense).
 - `match_score` is validated as an int 0-100 and clamped if the model returns
   something out of range.
+- `POST /api/v1/analyze` is rate-limited per client IP (default `10/minute`,
+  configurable via `ANALYZE_RATE_LIMIT`) so a public deploy can't silently
+  burn the shared LLM quota. Exceeding it returns `429` with
+  `{"error": "rate_limited", ...}`.
 
 ## Testing
 

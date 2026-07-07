@@ -1,14 +1,16 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.cache import get_cached_result
 from app.core.deps import get_scoring_provider
 from app.core.errors import NotFoundAppError, UpstreamAppError, ValidationAppError
 from app.core.hashing import sha256
 from app.core.ids import short_id
 from app.core.pdf import PDFExtractionError, extract_text_from_pdf
+from app.core.rate_limit import limiter
 from app.core.scoring import ScoringError, ScoringProvider
 from app.models.db import Analysis, get_session
 from app.models.schemas import AnalysisResult
@@ -22,7 +24,9 @@ async def health() -> dict:
 
 
 @router.post("/analyze", response_model=AnalysisResult)
+@limiter.limit(settings.analyze_rate_limit)
 async def analyze(
+    request: Request,
     job_description: str = Form(...),
     resume_file: UploadFile | None = File(None),
     resume_text: str | None = Form(None),
