@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -13,7 +14,7 @@ from app.core.pdf import PDFExtractionError, extract_text_from_pdf
 from app.core.rate_limit import limiter
 from app.core.scoring import ScoringError, ScoringProvider
 from app.models.db import Analysis, get_session
-from app.models.schemas import AnalysisResult
+from app.models.schemas import AnalysisListResponse, AnalysisResult
 
 router = APIRouter()
 
@@ -80,11 +81,36 @@ async def analyze(
         jd_hash=jd_hash,
         match_score=result.match_score,
         result_json=result.model_dump(mode="json"),
+        created_at=result.created_at,
     )
     session.add(row)
     await session.commit()
 
     return result
+
+
+@router.get("/analyze", response_model=AnalysisListResponse)
+async def list_analyses(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_session),
+) -> AnalysisListResponse:
+    total = (await session.execute(select(func.count()).select_from(Analysis))).scalar_one()
+
+    stmt = (
+        select(Analysis)
+        .order_by(Analysis.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+
+    return AnalysisListResponse(
+        items=[AnalysisResult.model_validate(row.result_json) for row in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/analyze/{analysis_id}", response_model=AnalysisResult)

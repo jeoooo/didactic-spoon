@@ -170,3 +170,61 @@ async def test_analyze_rate_limit_returns_429(client, mock_scoring_provider):
     resp = await client.post("/api/v1/analyze", data=payload)
     assert resp.status_code == 429
     assert resp.json()["error"] == "rate_limited"
+
+
+async def test_list_analyses_returns_newest_first(client, mock_scoring_provider):
+    mock_scoring_provider.score.return_value = VALID_ANALYSIS
+
+    first = await client.post(
+        "/api/v1/analyze",
+        data={
+            "job_description": "Looking for a Python backend engineer.",
+            "resume_text": "resume one",
+        },
+    )
+    second = await client.post(
+        "/api/v1/analyze",
+        data={
+            "job_description": "Looking for a Python backend engineer.",
+            "resume_text": "resume two",
+        },
+    )
+
+    resp = await client.get("/api/v1/analyze")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 2
+    assert body["limit"] == 20
+    assert body["offset"] == 0
+    assert [item["id"] for item in body["items"]] == [
+        second.json()["id"],
+        first.json()["id"],
+    ]
+
+
+async def test_list_analyses_pagination(client, mock_scoring_provider):
+    mock_scoring_provider.score.return_value = VALID_ANALYSIS
+
+    for i in range(3):
+        await client.post(
+            "/api/v1/analyze",
+            data={
+                "job_description": "Looking for a Python backend engineer.",
+                "resume_text": f"resume {i}",
+            },
+        )
+
+    resp = await client.get("/api/v1/analyze", params={"limit": 1, "offset": 1})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+    assert body["limit"] == 1
+    assert body["offset"] == 1
+    assert len(body["items"]) == 1
+
+
+async def test_list_analyses_empty(client):
+    resp = await client.get("/api/v1/analyze")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {"items": [], "total": 0, "limit": 20, "offset": 0}

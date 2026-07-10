@@ -41,7 +41,8 @@ Open `http://localhost:8000/docs` for interactive Swagger docs.
   `cached: true` and never touches the LLM, saving quota and latency on
   duplicate submissions.
 - **Persistence.** Every analysis is stored in Postgres as JSONB, keyed by a
-  short id, so results can be retrieved later via `GET /api/v1/analyze/{id}`.
+  short id, so results can be retrieved later via `GET /api/v1/analyze/{id}`,
+  or browsed newest-first via the paginated `GET /api/v1/analyze` list.
   Schema is managed with Alembic rather than created ad hoc.
 
 ## Example request
@@ -78,6 +79,21 @@ Fetch a past result:
 
 ```bash
 curl http://localhost:8000/api/v1/analyze/a1b2c3d4
+```
+
+List past analyses, newest first (`limit` default 20, max 100; `offset` default 0):
+
+```bash
+curl "http://localhost:8000/api/v1/analyze?limit=10&offset=0"
+```
+
+```json
+{
+  "items": [ { "id": "a1b2c3d4", "match_score": 78, "...": "..." } ],
+  "total": 1,
+  "limit": 10,
+  "offset": 0
+}
 ```
 
 ## Guardrails
